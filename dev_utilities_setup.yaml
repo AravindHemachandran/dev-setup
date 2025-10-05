@@ -1,0 +1,86 @@
+---
+- name: Developer Utilities Setup on Ubuntu 22.04
+  hosts: localhost
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install core developer utilities
+      apt:
+        name:
+          - vim
+          - git
+          - ssh
+          - openssl
+          - tmux
+          - htop
+          - screen
+          - meld
+        state: present
+
+    - name: Install btop from apt (Ubuntu 22.04+)
+      apt:
+        name: btop
+        state: present
+
+    - name: Install Postman (via snap)
+      snap:
+        name: postman
+        state: present
+        classic: true
+
+    - name: Install Docker dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Add current user to docker group
+      user:
+        name: "{{ lookup('env', 'USER') }}"
+        groups: docker
+        append: yes
+
+    - name: Download kubectl v1.33.0
+      get_url:
+        url: https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Verify kubectl version
+      command: kubectl version --client --output=yaml
+      register: kubectl_version_output
+      changed_when: false
+
+    - name: Show installed kubectl version
+      debug:
+        var: kubectl_version_output.stdout
