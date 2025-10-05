@@ -1,0 +1,104 @@
+---
+- name: Developer Toolchain Setup on Ubuntu 22.04
+  hosts: localhost
+  become: true
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install C/C++ build tools and debuggers
+      apt:
+        name:
+          - build-essential
+          - gdb
+          - valgrind
+        state: present
+
+    - name: Install OpenJDK 17
+      apt:
+        name: openjdk-17-jdk
+        state: present
+
+    - name: Install Python 3, pip and virtualenv
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
+
+    - name: Install common Python developer tools
+      pip:
+        name:
+          - virtualenv
+          - black
+          - flake8
+        executable: pip3
+
+    - name: Ensure curl and build dependencies are installed for NVM
+      apt:
+        name:
+          - curl
+          - ca-certificates
+          - build-essential
+          - libssl-dev
+          - net-tools
+        state: present
+
+    - name: Install NVM (Node Version Manager)
+      become: false
+      shell: |
+        export NVM_DIR="$HOME/.nvm"
+        if [ ! -d "$NVM_DIR" ]; then
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Load NVM and install Node.js v20.19.0
+      become: false
+      shell: |
+        export NVM_DIR="$HOME/.nvm"
+        source "$NVM_DIR/nvm.sh"
+        nvm install 20.19.0
+        nvm alias default 20.19.0
+      args:
+        executable: /bin/bash
+
+    - name: Install Go (via tarball method)
+      block:
+        - name: Get latest Go tarball URL
+          ansible.builtin.uri:
+            url: https://go.dev/VERSION?m=text
+            return_content: yes
+          register: go_version
+
+        - name: Download Go tarball
+          get_url:
+            url: "https://go.dev/dl/{{ go_version.content }}.linux-amd64.tar.gz"
+            dest: "/tmp/{{ go_version.content }}.linux-amd64.tar.gz"
+
+        - name: Remove any previous Go installation
+          file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Extract Go
+          unarchive:
+            src: "/tmp/{{ go_version.content }}.linux-amd64.tar.gz"
+            dest: /usr/local
+            remote_src: yes
+
+        - name: Ensure /usr/local/go/bin is in PATH
+          lineinfile:
+            path: /etc/profile
+            line: 'export PATH=$PATH:/usr/local/go/bin'
+            state: present
+
+    - name: Print post-install instructions
+      debug:
+        msg: |
+          ✅ Programming languages setup complete.
+          ▶️ Please run `source /etc/profile` or restart your terminal to use Go.
